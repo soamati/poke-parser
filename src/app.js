@@ -8,26 +8,23 @@ const BASE_URL = "https://pokeapi.co/api/v2/pokemon";
 
 async function getNames() {
   const { data } = await axios.get(WIKI_URL);
-  const $ = cheerio.load(data);
 
+  const $ = cheerio.load(data);
   const aEl = $(".tabpokemon td:nth-child(3) a");
 
-  let pokemons = aEl.map((_, el) => el.attribs.title).toArray();
-
-  pokemons = pokemons.map((name) =>
+  let names = aEl.map((_, el) => el.attribs.title).toArray();
+  names = names.map((name) =>
     name
       .toLowerCase()
       .replace(" ", "-")
       .replace(/[^A-Za-z\-]/, "")
   );
+  names = Array.from(new Set(names));
 
-  pokemons = Array.from(new Set(pokemons));
-
-  return pokemons;
+  return names;
 }
 
-async function main() {
-  const names = await getNames();
+async function getPokemons(names) {
   const promises = names.map((name) => axios.get(`${BASE_URL}/${name}`));
 
   let results = await Promise.allSettled(promises);
@@ -61,14 +58,21 @@ async function main() {
     };
   });
 
-  console.log(`Pokemons: ${pokemons.length}`);
+  return pokemons;
+}
 
-  const pokemonsJson = JSON.stringify(pokemons);
+function saveToJson(data) {
+  const timestamp = new Date().getTime();
+  const target = path.join(__dirname, "..", `pokemons-${timestamp}.json`);
+  fs.writeFileSync(target, data);
+}
+
+async function main() {
   try {
-    const timestamp = new Date().getTime();
-    const target = path.join(__dirname, "..", `pokemons-${timestamp}.json`);
-    fs.writeFileSync(target, pokemonsJson);
-    console.log("OK!");
+    const names = await getNames();
+    const pokemons = await getPokemons(names);
+    saveToJson(JSON.stringify(pokemons));
+    console.log(`DONE! ${pokemons.length} pokemons saved`);
   } catch (err) {
     console.log(err);
   }
